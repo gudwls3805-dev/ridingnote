@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>라이딩노트 | 오늘 달릴 바이크 코스 추천</title>
+  <meta name="description" content="출발지와 조건만 입력하면 AI가 이륜차로 달릴 수 있는 투어링 코스를 추천해 드려요.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="#home" class="logo">라이딩<span>노트</span></a>
+      <button class="menu-toggle" aria-label="메뉴 열기" aria-expanded="false" aria-controls="site-nav">
+        <span></span><span></span><span></span>
+      </button>
+      <nav id="site-nav" class="site-nav">
+        <a href="#home">홈</a>
+        <a href="#recommend">코스 추천</a>
+        <a href="#checklist">투어 준비</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1. 홈 -->
+    <section id="home" class="hero">
+      <div class="container hero-inner">
+        <p class="hero-kicker">이번 주말, 어디 탈까?</p>
+        <h1>출발지만 알려 주세요.<br>코스는 라이딩노트가 고를게요.</h1>
+        <p class="hero-desc">배기량과 시간, 좋아하는 길 스타일에 맞춰 고속도로 없이 국도로만 달리는 투어링 코스를 추천해 드려요.</p>
+        <a href="#recommend" class="btn btn-primary">코스 추천받기</a>
+        <ul class="hero-points">
+          <li><strong>2~3개</strong> 코스 비교</li>
+          <li><strong>국도</strong> 전용 경로</li>
+          <li><strong>휴식</strong> 포인트 포함</li>
+        </ul>
+      </div>
+      <div class="hero-road" aria-hidden="true"></div>
+    </section>
+
+    <!-- 2. 코스 추천 (AI 기능) -->
+    <section id="recommend" class="section">
+      <div class="container">
+        <h2 class="section-title">코스 추천</h2>
+        <p class="section-desc">조건을 고르고 추천받기를 누르면 AI가 코스를 짜 드려요. 10~20초 정도 걸려요.</p>
+
+        <div class="recommend-layout">
+          <form id="course-form" class="card form-card" novalidate>
+            <div class="field">
+              <label for="origin">출발 지역 <span class="required">*</span></label>
+              <input type="text" id="origin" name="origin" maxlength="30" placeholder="예: 서울 강동구, 대구 수성구" autocomplete="off">
+            </div>
+
+            <fieldset class="field">
+              <legend>라이딩 시간</legend>
+              <div class="chips">
+                <label class="chip"><input type="radio" name="duration" value="half"><span>반나절</span></label>
+                <label class="chip"><input type="radio" name="duration" value="day" checked><span>하루</span></label>
+                <label class="chip"><input type="radio" name="duration" value="overnight"><span>1박 2일</span></label>
+              </div>
+            </fieldset>
+
+            <fieldset class="field">
+              <legend>선호 스타일</legend>
+              <div class="chips">
+                <label class="chip"><input type="radio" name="style" value="winding" checked><span>와인딩</span></label>
+                <label class="chip"><input type="radio" name="style" value="coast"><span>해안도로</span></label>
+                <label class="chip"><input type="radio" name="style" value="mountain"><span>산길·고개</span></label>
+                <label class="chip"><input type="radio" name="style" value="cafe"><span>카페 투어</span></label>
+              </div>
+            </fieldset>
+
+            <div class="field">
+              <label for="displacement">배기량</label>
+              <select id="displacement" name="displacement">
+                <option value="small">125cc 이하</option>
+                <option value="mid" selected>중배기량 (126~600cc)</option>
+                <option value="large">대배기량 (600cc 초과)</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="note">추가 요청 <span class="optional">(선택)</span></label>
+              <textarea id="note" name="note" rows="3" maxlength="200" placeholder="예: 점심은 막국수, 비포장 길은 피하고 싶어요"></textarea>
+              <p class="counter"><span id="note-count">0</span> / 200</p>
+            </div>
+
+            <p id="form-message" class="form-message" role="alert" hidden></p>
+
+            <button type="submit" id="submit-btn" class="btn btn-primary btn-block">코스 추천받기</button>
+          </form>
+
+          <div id="result" class="result" aria-live="polite">
+            <div class="result-empty">
+              <p>조건을 입력하면 이곳에 추천 코스가 나타나요.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. 투어 준비 체크리스트 -->
+    <section id="checklist" class="section section-alt">
+      <div class="container">
+        <h2 class="section-title">투어 준비</h2>
+        <p class="section-desc">출발 전에 하나씩 체크해 보세요. <span id="check-progress">0 / 12</span></p>
+
+        <div class="checklist-grid">
+          <div class="card check-card">
+            <h3>장비</h3>
+            <label><input type="checkbox"> 헬멧, 쉴드 상태</label>
+            <label><input type="checkbox"> 라이딩 재킷, 장갑</label>
+            <label><input type="checkbox"> 부츠 또는 발목 덮는 신발</label>
+            <label><input type="checkbox"> 우비, 여벌 장갑</label>
+          </div>
+          <div class="card check-card">
+            <h3>바이크 점검</h3>
+            <label><input type="checkbox"> 타이어 공기압, 마모</label>
+            <label><input type="checkbox"> 브레이크, 체인 장력</label>
+            <label><input type="checkbox"> 엔진오일, 냉각수</label>
+            <label><input type="checkbox"> 라이트, 깜빡이 작동</label>
+          </div>
+          <div class="card check-card">
+            <h3>출발 전 확인</h3>
+            <label><input type="checkbox"> 경로 날씨, 기온</label>
+            <label><input type="checkbox"> 주유소 위치</label>
+            <label><input type="checkbox"> 지도 앱으로 경로 확인</label>
+            <label><input type="checkbox"> 동행자에게 일정 공유</label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. FAQ -->
+    <section id="faq" class="section">
+      <div class="container narrow">
+        <h2 class="section-title">FAQ</h2>
+        <div class="faq-list">
+          <details>
+            <summary>추천 코스를 그대로 믿고 가도 되나요?</summary>
+            <p>AI 추천은 출발 전 아이디어로 활용해 주세요. 도로 공사, 통제, 계절 사정은 반영되지 않을 수 있으니 출발 전에 지도 앱으로 경로를 꼭 확인하세요. 결과의 경유지를 누르면 네이버지도에서 바로 검색할 수 있어요.</p>
+          </details>
+          <details>
+            <summary>고속도로가 들어간 코스가 나오면 어떡하나요?</summary>
+            <p>이륜차는 고속도로와 자동차전용도로를 달릴 수 없어서, AI에게 국도·지방도만 쓰도록 지시하고 있어요. 그래도 섞여 나왔다면 그 구간은 우회 경로로 바꿔 주세요.</p>
+          </details>
+          <details>
+            <summary>125cc로도 투어를 갈 수 있나요?</summary>
+            <p>물론이에요. 배기량을 125cc 이하로 고르면 이동 거리를 짧게 잡고 무리한 고개 코스는 피해서 추천해요.</p>
+          </details>
+          <details>
+            <summary>이용 요금이 있나요?</summary>
+            <p>무료예요. 다만 AI 호출에는 비용이 들기 때문에 같은 조건으로 연속 요청하는 건 자제해 주세요.</p>
+          </details>
+          <details>
+            <summary>입력한 내용이 저장되나요?</summary>
+            <p>저장하지 않아요. 입력한 조건은 코스를 만드는 데만 쓰이고 바로 사라져요.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>라이딩노트 · AI 추천은 참고용이에요. 안전 장비 착용, 안전 운전!</p>
+    </div>
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
