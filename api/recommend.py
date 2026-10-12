@@ -123,7 +123,9 @@ def normalize_courses(raw):
 
 def ask_openai(data):
     model = os.environ.get("OPENAI_MODEL", "gpt-5-mini")
-    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"], timeout=25.0, max_retries=0)
+    # 붙여 넣을 때 섞인 공백/줄바꿈을 제거한다
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    client = OpenAI(api_key=api_key, timeout=25.0, max_retries=0)
 
     options = {}
     # gpt-5 계열은 추론 강도를 낮춰 응답 속도를 높인다 (다른 모델에서는 이 옵션을 보내지 않음)
@@ -171,18 +173,24 @@ class handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": error})
 
         # 3) API 키 확인 (키는 환경 변수에서만 읽는다)
-        if not os.environ.get("OPENAI_API_KEY"):
-            return self._send(500, {"error": "서버 설정에 문제가 있어요. 관리자에게 알려 주세요."})
+        api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            print("[recommend] OPENAI_API_KEY 환경 변수가 비어 있거나 없음")
+            return self._send(500, {"error": "서버 설정에 문제가 있어요. 관리자에게 알려 주세요.", "code": "missing_key"})
+        # 키 앞부분만 로그에 남겨 어떤 키가 들어갔는지 확인 (전체 키는 절대 출력하지 않음)
+        print(f"[recommend] 키 확인: {api_key[:7]}... (길이 {len(api_key)})")
 
         # 4) OpenAI 호출
         try:
             raw = ask_openai(data)
         except APITimeoutError:
             return self._send(504, {"error": "AI 응답이 너무 늦어요. 잠시 후 다시 시도해 주세요."})
-        except RateLimitError:
+        except RateLimitError as e:
+            print(f"[recommend] OpenAI 429: {e.message}")
             return self._send(429, {"error": "요청이 많아 잠시 쉬는 중이에요. 1분 뒤에 다시 시도해 주세요."})
-        except AuthenticationError:
-            return self._send(500, {"error": "서버 설정에 문제가 있어요. 관리자에게 알려 주세요."})
+        except AuthenticationError as e:
+            print(f"[recommend] OpenAI 인증 실패(401): {e.message}")
+            return self._send(500, {"error": "서버 설정에 문제가 있어요. 관리자에게 알려 주세요.", "code": "invalid_key"})
         except (APIError, json.JSONDecodeError) as e:
             print(f"[recommend] OpenAI error: {e!r}")
             return self._send(502, {"error": "추천 서버가 응답하지 않아요. 잠시 후 다시 시도해 주세요."})
