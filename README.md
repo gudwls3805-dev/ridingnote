@@ -2,7 +2,8 @@
 
 출발지와 조건만 입력하면 AI가 **이륜차로 달릴 수 있는 투어링 코스**를 추천해 주는 웹 서비스입니다.
 
-- **배포 URL:** https://(배포 후 여기에 Vercel 주소 입력).vercel.app
+- **배포 URL:** https://ridingnote.vercel.app
+- **GitHub:** https://github.com/gudwls3805-dev/ridingnote
 - **타겟:** 아는 코스가 적은 1~3년 차 라이더, 새로운 지역을 달려보고 싶은 투어 라이더
 
 ## 주요 기능
