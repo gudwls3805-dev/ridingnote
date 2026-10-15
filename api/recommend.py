@@ -19,7 +19,7 @@ import json
 import os
 from http.server import BaseHTTPRequestHandler
 
-from openai import OpenAI, APIError, APITimeoutError, RateLimitError, AuthenticationError
+from openai import OpenAI, APIError, BadRequestError, PermissionDeniedError, APITimeoutError, RateLimitError, AuthenticationError
 
 MAX_NOTE_LENGTH = 200
 MAX_BODY_BYTES = 5_000
@@ -121,28 +121,54 @@ def normalize_courses(raw):
     return result or None
 
 
-def ask_openai(data):
-    model = os.environ.get("OPENAI_MODEL", "gpt-5-mini")
+def parse_json(content):
+    """AI 응답에서 JSON만 꺼낸다. ```json 코드 블록이나 앞뒤 설명이 붙어 와도 처리한다."""
+    text = content.strip()
+    start, end = text.find("{"), text.rfind("}")
+    if start == -1 or end == -1:
+        raise json.JSONDecodeError("JSON 객체를 찾지 못함", text, 0)
+    return json.loads(text[start:end + 1])
+
+
+# Gemini는 OpenAI와 같은 형식으로 호출할 수 있는 주소를 제공한다.
+# 그래서 openai 패키지를 그대로 쓰고, 주소(base_url)만 Gemini로 바꾼다.
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+DEFAULT_MODEL = "gemini-3.8-flash"
+
+
+def get_api_key():
     # 붙여 넣을 때 섞인 공백/줄바꿈을 제거한다
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-    client = OpenAI(api_key=api_key, timeout=25.0, max_retries=0)
+    return os.environ.get("GEMINI_API_KEY", "").strip()
 
-    options = {}
-    # gpt-5 계열은 추론 강도를 낮춰 응답 속도를 높인다 (다른 모델에서는 이 옵션을 보내지 않음)
-    if model.startswith("gpt-5"):
-        options["reasoning_effort"] = "low"
 
-    completion = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": build_user_prompt(data)},
-        ],
-        response_format={"type": "json_object"},
-        **options,
-    )
+def ask_ai(data):
+    model = os.environ.get("GEMINI_MODEL", "").strip() or DEFAULT_MODEL
+    client = OpenAI(api_key=get_api_key(), base_url=GEMINI_BASE_URL, timeout=25.0, max_retries=0)
+
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": build_user_prompt(data)},
+    ]
+
+    # 1차: JSON 응답 모드 + 낮은 추론 강도로 빠르게 요청
+    try:
+        completion = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            response_format={"type": "json_object"},
+            reasoning_effort="low",
+        )
+    except BadRequestError as e:
+        # 2차: 일부 옵션을 지원하지 않는 모델이면(400) 옵션 없이 다시 요청
+        print(f"[recommend] 옵션 미지원(400), 기본 옵션으로 재시도: {e.message}")
+        completion = client.chat.completions.create(model=model, messages=messages)
+
     content = completion.choices[0].message.content or ""
-    return json.loads(content)
+    try:
+        return parse_json(content)
+    except json.JSONDecodeError:
+        print(f"[recommend] JSON 파싱 실패. 응답 앞부분: {content[:200]!r}")
+        raise
 
 
 class handler(BaseHTTPRequestHandler):
@@ -173,27 +199,29 @@ class handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": error})
 
         # 3) API 키 확인 (키는 환경 변수에서만 읽는다)
-        api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        api_key = get_api_key()
         if not api_key:
-            print("[recommend] OPENAI_API_KEY 환경 변수가 비어 있거나 없음")
+            print("[recommend] GEMINI_API_KEY 환경 변수가 비어 있거나 없음")
             return self._send(500, {"error": "서버 설정에 문제가 있어요. 관리자에게 알려 주세요.", "code": "missing_key"})
         # 키 앞부분만 로그에 남겨 어떤 키가 들어갔는지 확인 (전체 키는 절대 출력하지 않음)
         print(f"[recommend] 키 확인: {api_key[:7]}... (길이 {len(api_key)})")
 
-        # 4) OpenAI 호출
+        # 4) Gemini 호출
         try:
-            raw = ask_openai(data)
+            raw = ask_ai(data)
         except APITimeoutError:
             return self._send(504, {"error": "AI 응답이 너무 늦어요. 잠시 후 다시 시도해 주세요."})
         except RateLimitError as e:
-            print(f"[recommend] OpenAI 429: {e.message}")
+            print(f"[recommend] 429 사용량 초과: {e.message}")
             return self._send(429, {"error": "요청이 많아 잠시 쉬는 중이에요. 1분 뒤에 다시 시도해 주세요."})
-        except AuthenticationError as e:
-            print(f"[recommend] OpenAI 인증 실패(401): {e.message}")
+        except (AuthenticationError, PermissionDeniedError) as e:
+            print(f"[recommend] 인증 실패({getattr(e, 'status_code', None)}): {e.message}")
             return self._send(500, {"error": "서버 설정에 문제가 있어요. 관리자에게 알려 주세요.", "code": "invalid_key"})
-        except (APIError, json.JSONDecodeError) as e:
-            print(f"[recommend] OpenAI error: {e!r}")
-            return self._send(502, {"error": "추천 서버가 응답하지 않아요. 잠시 후 다시 시도해 주세요."})
+        except APIError as e:
+            print(f"[recommend] AI 서버 오류: status={getattr(e, 'status_code', None)} {e.message}")
+            return self._send(502, {"error": "추천 서버가 응답하지 않아요. 잠시 후 다시 시도해 주세요.", "code": "upstream_error"})
+        except json.JSONDecodeError:
+            return self._send(502, {"error": "추천 결과를 읽지 못했어요. 다시 시도해 주세요.", "code": "bad_json"})
 
         courses = normalize_courses(raw)
         if not courses:

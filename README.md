@@ -28,7 +28,7 @@
 
 - **프론트엔드:** HTML, CSS(미디어 쿼리 반응형), JavaScript(fetch, AbortController) — 프레임워크 없음
 - **백엔드:** Vercel Serverless Functions (Python, `BaseHTTPRequestHandler`)
-- **AI:** OpenAI Chat Completions API (JSON 응답 모드), 기본 모델 `gpt-5-mini`
+- **AI:** Google Gemini API (OpenAI 호환 엔드포인트 + `openai` 파이썬 패키지), 기본 모델 `gemini-3.8-flash`
 - **배포:** GitHub + Vercel 자동 배포
 
 ## 폴더 구조
@@ -38,7 +38,7 @@ ridingnote/
 ├── index.html          # 화면 구조 (4개 섹션)
 ├── css/style.css       # 스타일, 반응형
 ├── js/app.js           # 메뉴, fetch 호출, 결과 렌더링, 실패 처리
-├── api/recommend.py    # POST /api/recommend → OpenAI 호출
+├── api/recommend.py    # POST /api/recommend → Gemini 호출
 ├── images/
 ├── requirements.txt    # Python 패키지 (openai)
 ├── vercel.json         # 함수 최대 실행 시간 설정
@@ -50,8 +50,8 @@ ridingnote/
 
 1. 사용자가 폼을 제출하면 `js/app.js`가 입력을 검사합니다.
 2. `fetch('/api/recommend', { method: 'POST' })`로 조건을 JSON으로 보냅니다.
-3. `api/recommend.py`가 입력을 다시 검증하고, 환경 변수의 API 키로 OpenAI를 호출합니다.
-4. OpenAI가 돌려준 JSON을 정리해 응답하면, 프론트가 코스 카드로 그립니다.
+3. `api/recommend.py`가 입력을 다시 검증하고, 환경 변수의 API 키로 Gemini를 호출합니다.
+4. Gemini가 돌려준 JSON을 정리해 응답하면, 프론트가 코스 카드로 그립니다.
 
 API 키는 서버 함수 안에서만 쓰이므로 브라우저(개발자 도구 네트워크 탭)에 노출되지 않습니다.
 
@@ -59,14 +59,20 @@ API 키는 서버 함수 안에서만 쓰이므로 브라우저(개발자 도구
 
 | 이름 | 필수 | 설명 |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | 필수 | OpenAI API 키 |
-| `OPENAI_MODEL` | 선택 | 사용할 모델 이름 (기본값 `gpt-5-mini`) |
+| `GEMINI_API_KEY` | 필수 | Google AI Studio에서 발급한 Gemini API 키 |
+| `GEMINI_MODEL` | 선택 | 사용할 모델 이름 (기본값 `gemini-3.8-flash`) |
 
 **Vercel:** 프로젝트 → Settings → Environment Variables에서 위 값을 추가한 뒤 **재배포**해야 적용됩니다.
 
 **로컬:** `.env.example`을 복사해 `.env`를 만들고 키를 넣습니다. `.env`는 `.gitignore`에 들어 있어 GitHub에 올라가지 않습니다.
 
-> ⚠️ 키를 코드, README, 스크린샷에 절대 넣지 마세요. 실수로 커밋했다면 OpenAI 대시보드에서 키를 즉시 폐기하고 새로 발급하세요.
+> ⚠️ 키를 코드, README, 스크린샷에 절대 넣지 마세요. 실수로 커밋했다면 Google AI Studio에서 키를 즉시 폐기하고 새로 발급하세요.
+
+### API 선택 과정 (트러블슈팅 기록)
+
+처음에는 교육 과정에서 받은 코디세이 키로 OpenAI를 호출했지만 `401 Unauthorized`가 발생했습니다.
+Vercel Logs를 확인해 보니 요청이 `api.openai.com`으로 가고 있었고, 코디세이 키는 전용 서버(`copa.codyssey.kr`)에서만 쓸 수 있는 키였습니다.
+이후 Gemini API로 전환했고, Gemini가 OpenAI 호환 주소를 제공하기 때문에 `openai` 패키지는 그대로 두고 `base_url`과 모델만 바꿨습니다.
 
 ## 로컬 실행
 
@@ -83,5 +89,5 @@ vercel dev             # http://localhost:3000
 1. GitHub에 저장소를 만들고 코드를 push합니다.
 2. [vercel.com](https://vercel.com) → Add New → Project → GitHub 저장소 Import
 3. Framework Preset은 **Other**, 나머지는 기본값 그대로 둡니다.
-4. Environment Variables에 `OPENAI_API_KEY`를 추가하고 Deploy
+4. Environment Variables에 `GEMINI_API_KEY`를 추가하고 Deploy
 5. 이후에는 `git push`만 하면 자동으로 재배포됩니다.
